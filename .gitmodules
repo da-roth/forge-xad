@@ -1,3 +1,6 @@
 [submodule "extern/forge"]
 	path = extern/forge
 	url = https://github.com/da-roth/forge.git
+[submodule "extern/XAD"]
+	path = extern/XAD
+	url = https://github.com/da-roth/xad.git
