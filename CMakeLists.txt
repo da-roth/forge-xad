@@ -61,6 +61,10 @@ target_link_libraries(forge_xad_bridge PUBLIC
 # Set compile options
 target_compile_features(forge_xad_bridge PUBLIC cxx_std_17)
 
+# Create an ALIAS for namespaced usage in build tree (like XAD::xad)
+# This allows consumers to use forge_xad::bridge when including via add_subdirectory
+add_library(forge_xad::bridge ALIAS forge_xad_bridge)
+
 # Add examples
 if(FORGE_XAD_BUILD_EXAMPLES)
     add_subdirectory(examples)
@@ -72,9 +76,10 @@ if(FORGE_XAD_BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
-# Installation - this creates the ForgeXADTargets export set
+# Installation (optional - not needed for build-only usage)
+# Note: Installation is complex because forge and its dependencies (asmjit, sleef)
+# are FetchContent targets and would need to be included in the export set
 install(TARGETS forge_xad_bridge
-    EXPORT ForgeXADTargets
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
     RUNTIME DESTINATION bin
@@ -82,18 +87,4 @@ install(TARGETS forge_xad_bridge
 
 install(DIRECTORY include/
     DESTINATION include
-)
-
-# Export targets for use in build tree (like XAD does)
-# This must come AFTER install(TARGETS ... EXPORT) which creates the export set
-export(EXPORT ForgeXADTargets
-    FILE "${CMAKE_CURRENT_BINARY_DIR}/ForgeXADTargets.cmake"
-    NAMESPACE forge_xad::
-)
-
-# Install the export set with namespace (for installed use)
-install(EXPORT ForgeXADTargets
-    FILE ForgeXADTargets.cmake
-    NAMESPACE forge_xad::
-    DESTINATION lib/cmake/ForgeXAD
 )
