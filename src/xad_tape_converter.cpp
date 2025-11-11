@@ -68,6 +68,8 @@ ConversionResult convertXadTapeToForge(const xad::Tape<Real, N>& tape) {
         // Get operation type directly from tape (no inference needed!)
         xad::OpCode xad_opcode = op_types[stmt_idx];
 
+        forge::NodeId result_node_id;
+
         // Handle special XAD opcodes that don't map directly to Forge
         if (xad_opcode == xad::OpCode::Assign && operands.size() == 1) {
             // Assignment: just pass through the existing node
@@ -75,9 +77,76 @@ ConversionResult convertXadTapeToForge(const xad::Tape<Real, N>& tape) {
             continue;
         }
 
-        forge::OpCode opcode = static_cast<forge::OpCode>(static_cast<uint16_t>(xad_opcode));
+        // Handle scalar operations by converting to binary op with constant
+        if ((xad_opcode == xad::OpCode::ScalarMul || xad_opcode == xad::OpCode::ScalarAdd ||
+             xad_opcode == xad::OpCode::ScalarSub1 || xad_opcode == xad::OpCode::ScalarSub2 ||
+             xad_opcode == xad::OpCode::ScalarDiv1 || xad_opcode == xad::OpCode::ScalarDiv2) &&
+            operands.size() == 1) {
 
-        forge::NodeId result_node_id;
+            double scalar_value = operands[0].multiplier;
+            forge::NodeId operand_id = slot_to_node[operands[0].slot];
+
+            // Create constant node for scalar
+            forge::Node const_node;
+            const_node.op = forge::OpCode::Constant;
+            const_node.a = 0;
+            const_node.b = 0;
+            const_node.c = 0;
+            const_node.imm = static_cast<double>(result.graph.constPool.size());
+            const_node.isActive = false;
+            const_node.isDead = false;
+            const_node.needsGradient = false;
+
+            forge::NodeId const_node_id = static_cast<forge::NodeId>(result.graph.nodes.size());
+            result.graph.nodes.push_back(const_node);
+            result.graph.constPool.push_back(scalar_value);
+
+            // Create binary operation node
+            forge::Node binary_node;
+            if (xad_opcode == xad::OpCode::ScalarMul) {
+                binary_node.op = forge::OpCode::Mul;
+                binary_node.a = const_node_id;
+                binary_node.b = operand_id;
+            } else if (xad_opcode == xad::OpCode::ScalarAdd) {
+                binary_node.op = forge::OpCode::Add;
+                binary_node.a = operand_id;
+                binary_node.b = const_node_id;
+            } else if (xad_opcode == xad::OpCode::ScalarSub1) {
+                // c - x
+                binary_node.op = forge::OpCode::Sub;
+                binary_node.a = const_node_id;
+                binary_node.b = operand_id;
+            } else if (xad_opcode == xad::OpCode::ScalarSub2) {
+                // x - c
+                binary_node.op = forge::OpCode::Sub;
+                binary_node.a = operand_id;
+                binary_node.b = const_node_id;
+            } else if (xad_opcode == xad::OpCode::ScalarDiv1) {
+                // c / x
+                binary_node.op = forge::OpCode::Div;
+                binary_node.a = const_node_id;
+                binary_node.b = operand_id;
+            } else { // ScalarDiv2
+                // x / c
+                binary_node.op = forge::OpCode::Div;
+                binary_node.a = operand_id;
+                binary_node.b = const_node_id;
+            }
+            binary_node.c = 0;
+            binary_node.imm = 0.0;
+            binary_node.isActive = true;
+            binary_node.isDead = false;
+            binary_node.needsGradient = result.graph.nodes[operand_id].needsGradient;
+
+            result_node_id = static_cast<forge::NodeId>(result.graph.nodes.size());
+            result.graph.nodes.push_back(binary_node);
+
+            // Map this slot to the result node
+            slot_to_node[lhs_slot] = result_node_id;
+            continue;
+        }
+
+        forge::OpCode opcode = static_cast<forge::OpCode>(static_cast<uint16_t>(xad_opcode));
 
         // Handle different operation types
         if (opcode == forge::OpCode::Neg ||
