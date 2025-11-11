@@ -36,7 +36,7 @@ set(FORGE_USE_STATIC_RUNTIME OFF CACHE BOOL "Use dynamic runtime (/MD) to match 
 
 # Suppress asmjit deprecation warnings
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    add_compile_options(-Wno-\#pragma-messages)
+    add_compile_options(-Wno-cpp)
 elseif(MSVC)
     add_compile_options(/wd4995)
 endif()
