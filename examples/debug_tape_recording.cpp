@@ -13,9 +13,11 @@ void printTapeContents(const tape_type& tape, const std::string& operation_name)
 
     auto& statements = tape.getStatements();
     auto& operations = tape.getOperations();
+    auto& op_types = tape.getOpTypes();
 
     std::cout << "Statements: " << statements.size() << std::endl;
     std::cout << "Operations: " << operations.size() << std::endl;
+    std::cout << "OpCodes: " << op_types.size() << std::endl;
 
     // Print each statement
     for (size_t i = 0; i < statements.size(); ++i) {
@@ -27,6 +29,10 @@ void printTapeContents(const tape_type& tape, const std::string& operation_name)
             std::cout << " (INVALID)" << std::endl;
             continue;
         }
+
+        // Get OpCode for this statement
+        xad::OpCode opcode = op_types[i];
+        std::cout << ", OpCode=" << static_cast<int>(opcode);
 
         // Get operations for this statement
         unsigned int op_start = (i > 0) ? statements[i-1].first : 0;
