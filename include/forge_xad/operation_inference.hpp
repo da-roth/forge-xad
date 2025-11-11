@@ -3,6 +3,7 @@
 #include <graph/graph.hpp>
 #include <vector>
 #include <utility>
+#include <cmath>
 
 namespace forge_xad {
 

@@ -67,6 +67,14 @@ ConversionResult convertXadTapeToForge(const xad::Tape<Real, N>& tape) {
 
         // Get operation type directly from tape (no inference needed!)
         xad::OpCode xad_opcode = op_types[stmt_idx];
+
+        // Handle special XAD opcodes that don't map directly to Forge
+        if (xad_opcode == xad::OpCode::Assign && operands.size() == 1) {
+            // Assignment: just pass through the existing node
+            slot_to_node[lhs_slot] = slot_to_node[operands[0].slot];
+            continue;
+        }
+
         forge::OpCode opcode = static_cast<forge::OpCode>(static_cast<uint16_t>(xad_opcode));
 
         forge::NodeId result_node_id;
@@ -74,17 +82,11 @@ ConversionResult convertXadTapeToForge(const xad::Tape<Real, N>& tape) {
         // Handle different operation types
         if (opcode == forge::OpCode::Neg ||
             opcode == forge::OpCode::Exp || opcode == forge::OpCode::Log ||
-            opcode == forge::OpCode::Log10 || opcode == forge::OpCode::Log2 ||
-            opcode == forge::OpCode::Sqrt || opcode == forge::OpCode::Cbrt ||
+            opcode == forge::OpCode::Sqrt ||
             opcode == forge::OpCode::Sin || opcode == forge::OpCode::Cos ||
-            opcode == forge::OpCode::Tan || opcode == forge::OpCode::Asin ||
-            opcode == forge::OpCode::Acos || opcode == forge::OpCode::Atan ||
-            opcode == forge::OpCode::Sinh || opcode == forge::OpCode::Cosh ||
-            opcode == forge::OpCode::Tanh || opcode == forge::OpCode::Asinh ||
-            opcode == forge::OpCode::Acosh || opcode == forge::OpCode::Atanh ||
+            opcode == forge::OpCode::Tan ||
             opcode == forge::OpCode::Abs || opcode == forge::OpCode::Square ||
-            opcode == forge::OpCode::Recip || opcode == forge::OpCode::Erf ||
-            opcode == forge::OpCode::Erfc) {
+            opcode == forge::OpCode::Recip) {
             // Unary operations
             forge::NodeId operand_id = slot_to_node[operands[0].slot];
 
@@ -104,7 +106,7 @@ ConversionResult convertXadTapeToForge(const xad::Tape<Real, N>& tape) {
         }
         else if (opcode == forge::OpCode::Add || opcode == forge::OpCode::Sub ||
                  opcode == forge::OpCode::Mul || opcode == forge::OpCode::Div ||
-                 opcode == forge::OpCode::Pow || opcode == forge::OpCode::Atan2 ||
+                 opcode == forge::OpCode::Pow ||
                  opcode == forge::OpCode::Max || opcode == forge::OpCode::Min) {
             // Binary operations
             if (operands.size() != 2) {
@@ -130,64 +132,14 @@ ConversionResult convertXadTapeToForge(const xad::Tape<Real, N>& tape) {
             result_node_id = static_cast<forge::NodeId>(result.graph.nodes.size());
             result.graph.nodes.push_back(binary_node);
         }
-        else if (opcode == forge::OpCode::Assign && operands.size() == 1) {
-            // Assignment/identity: just pass through the existing node
-            result_node_id = slot_to_node[operands[0].slot];
-        }
-        else if (opcode == forge::OpCode::ScalarMul && operands.size() == 1) {
-            // Scalar multiplication: m * x (coefficient stored in derivative)
-            double multiplier = operands[0].multiplier;
-            forge::NodeId operand_id = slot_to_node[operands[0].slot];
-
-            // Create constant node for multiplier
-            forge::Node const_node;
-            const_node.op = forge::OpCode::Constant;
-            const_node.a = 0;
-            const_node.b = 0;
-            const_node.c = 0;
-            const_node.imm = static_cast<double>(result.graph.constPool.size());
-            const_node.isActive = false;  // Constants are inactive
-            const_node.isDead = false;
-            const_node.needsGradient = false;  // Constants never need gradients
-
-            forge::NodeId const_node_id = static_cast<forge::NodeId>(result.graph.nodes.size());
-            result.graph.nodes.push_back(const_node);
-            result.graph.constPool.push_back(multiplier);
-
-            // Create multiply node
-            forge::Node mul_node;
-            mul_node.op = forge::OpCode::Mul;
-            mul_node.a = operand_id;
-            mul_node.b = const_node_id;
-            mul_node.c = 0;
-            mul_node.imm = 0.0;
-            mul_node.isActive = true;
-            mul_node.isDead = false;
-            // Forward propagation: multiply needs gradient if operand needs gradient
-            // (constant never needs gradient, so we only check the operand)
-            mul_node.needsGradient = result.graph.nodes[operand_id].needsGradient;
-
-            result_node_id = static_cast<forge::NodeId>(result.graph.nodes.size());
-            result.graph.nodes.push_back(mul_node);
-        }
         else {
-            // Unsupported operation
-            std::cerr << "Warning: Unsupported operation OpCode=" << static_cast<int>(opcode)
-                      << " with " << operands.size() << " operands" << std::endl;
-
-            // Create a dummy node to keep going
-            forge::Node dummy_node;
-            dummy_node.op = forge::OpCode::Input;
-            dummy_node.a = 0;
-            dummy_node.b = 0;
-            dummy_node.c = 0;
-            dummy_node.imm = 0.0;
-            dummy_node.isActive = false;
-            dummy_node.isDead = true;
-            dummy_node.needsGradient = false;
-
-            result_node_id = static_cast<forge::NodeId>(result.graph.nodes.size());
-            result.graph.nodes.push_back(dummy_node);
+            // Unsupported operation - throw exception
+            std::string error_msg = "Unsupported XAD operation OpCode=" +
+                                  std::to_string(static_cast<int>(xad_opcode)) +
+                                  " (Forge OpCode=" + std::to_string(static_cast<int>(opcode)) + ")" +
+                                  " with " + std::to_string(operands.size()) + " operands. " +
+                                  "This operation is not yet supported in Forge.";
+            throw std::runtime_error(error_msg);
         }
 
         // Map this slot to the result node
