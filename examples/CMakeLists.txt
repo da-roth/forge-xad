@@ -71,3 +71,11 @@ add_executable(debug_tape_recording
 target_link_libraries(debug_tape_recording PRIVATE
     xad
 )
+
+# Test OpCode accessibility
+add_executable(test_opcode
+    test_opcode.cpp
+)
+target_link_libraries(test_opcode PRIVATE
+    xad
+)
