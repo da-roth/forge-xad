@@ -61,13 +61,6 @@ target_link_libraries(forge_xad_bridge PUBLIC
 # Set compile options
 target_compile_features(forge_xad_bridge PUBLIC cxx_std_17)
 
-# Export targets for use in build tree (like XAD does)
-# This allows other projects to use forge_xad::bridge via add_subdirectory
-export(EXPORT ForgeXADTargets
-    FILE "${CMAKE_CURRENT_BINARY_DIR}/ForgeXADTargets.cmake"
-    NAMESPACE forge_xad::
-)
-
 # Add examples
 if(FORGE_XAD_BUILD_EXAMPLES)
     add_subdirectory(examples)
@@ -79,7 +72,7 @@ if(FORGE_XAD_BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
-# Installation (optional)
+# Installation - this creates the ForgeXADTargets export set
 install(TARGETS forge_xad_bridge
     EXPORT ForgeXADTargets
     LIBRARY DESTINATION lib
@@ -89,6 +82,13 @@ install(TARGETS forge_xad_bridge
 
 install(DIRECTORY include/
     DESTINATION include
+)
+
+# Export targets for use in build tree (like XAD does)
+# This must come AFTER install(TARGETS ... EXPORT) which creates the export set
+export(EXPORT ForgeXADTargets
+    FILE "${CMAKE_CURRENT_BINARY_DIR}/ForgeXADTargets.cmake"
+    NAMESPACE forge_xad::
 )
 
 # Install the export set with namespace (for installed use)
