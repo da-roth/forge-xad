@@ -63,3 +63,11 @@ add_executable(jit_tape_debug
 target_link_libraries(jit_tape_debug PRIVATE
     forge_xad_bridge
 )
+
+# Debug tape recording (understand how XAD records operations)
+add_executable(debug_tape_recording
+    debug_tape_recording.cpp
+)
+target_link_libraries(debug_tape_recording PRIVATE
+    xad
+)
