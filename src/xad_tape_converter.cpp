@@ -38,7 +38,7 @@ ConversionResult convertXadTapeToForge(const xad::Tape<Real, N>& tape) {
     // Step 2: Process statements
     const auto& statements = tape.getStatements();
     const auto& operations = tape.getOperations();
-
+    const auto& op_types = tape.getOpTypes();
 
     // Skip first statement (it's a dummy entry from XAD)
     for (size_t stmt_idx = 1; stmt_idx < statements.size(); ++stmt_idx) {
@@ -65,41 +65,58 @@ ConversionResult convertXadTapeToForge(const xad::Tape<Real, N>& tape) {
             continue;
         }
 
-        // Infer operation type
-        forge::OpCode opcode = OperationInference::inferOpCode(operands);
+        // Get operation type directly from tape (no inference needed!)
+        xad::OpCode xad_opcode = op_types[stmt_idx];
+        forge::OpCode opcode = static_cast<forge::OpCode>(static_cast<uint16_t>(xad_opcode));
 
         forge::NodeId result_node_id;
 
         // Handle different operation types
-        if (opcode == forge::OpCode::Neg) {
-            // Unary negation: -x
+        if (opcode == forge::OpCode::Neg ||
+            opcode == forge::OpCode::Exp || opcode == forge::OpCode::Log ||
+            opcode == forge::OpCode::Log10 || opcode == forge::OpCode::Log2 ||
+            opcode == forge::OpCode::Sqrt || opcode == forge::OpCode::Cbrt ||
+            opcode == forge::OpCode::Sin || opcode == forge::OpCode::Cos ||
+            opcode == forge::OpCode::Tan || opcode == forge::OpCode::Asin ||
+            opcode == forge::OpCode::Acos || opcode == forge::OpCode::Atan ||
+            opcode == forge::OpCode::Sinh || opcode == forge::OpCode::Cosh ||
+            opcode == forge::OpCode::Tanh || opcode == forge::OpCode::Asinh ||
+            opcode == forge::OpCode::Acosh || opcode == forge::OpCode::Atanh ||
+            opcode == forge::OpCode::Abs || opcode == forge::OpCode::Square ||
+            opcode == forge::OpCode::Recip || opcode == forge::OpCode::Erf ||
+            opcode == forge::OpCode::Erfc) {
+            // Unary operations
             forge::NodeId operand_id = slot_to_node[operands[0].slot];
 
-            forge::Node neg_node;
-            neg_node.op = forge::OpCode::Neg;
-            neg_node.a = operand_id;
-            neg_node.b = 0;
-            neg_node.c = 0;
-            neg_node.imm = 0.0;
-            neg_node.isActive = true;
-            neg_node.isDead = false;
+            forge::Node unary_node;
+            unary_node.op = opcode;
+            unary_node.a = operand_id;
+            unary_node.b = 0;
+            unary_node.c = 0;
+            unary_node.imm = 0.0;
+            unary_node.isActive = true;
+            unary_node.isDead = false;
             // Forward propagation: node needs gradient if operand needs gradient
-            neg_node.needsGradient = result.graph.nodes[operand_id].needsGradient;
+            unary_node.needsGradient = result.graph.nodes[operand_id].needsGradient;
 
             result_node_id = static_cast<forge::NodeId>(result.graph.nodes.size());
-            result.graph.nodes.push_back(neg_node);
+            result.graph.nodes.push_back(unary_node);
         }
-        else if ((opcode == forge::OpCode::Add || opcode == forge::OpCode::Sub) && operands.size() == 2) {
-            // Binary addition or subtraction
-            forge::OpCode actual_op = OperationInference::isSubtraction(operands)
-                ? forge::OpCode::Sub
-                : forge::OpCode::Add;
+        else if (opcode == forge::OpCode::Add || opcode == forge::OpCode::Sub ||
+                 opcode == forge::OpCode::Mul || opcode == forge::OpCode::Div ||
+                 opcode == forge::OpCode::Pow || opcode == forge::OpCode::Atan2 ||
+                 opcode == forge::OpCode::Max || opcode == forge::OpCode::Min) {
+            // Binary operations
+            if (operands.size() != 2) {
+                std::cerr << "Warning: Binary operation with " << operands.size() << " operands" << std::endl;
+                continue;
+            }
 
             forge::NodeId a_id = slot_to_node[operands[0].slot];
             forge::NodeId b_id = slot_to_node[operands[1].slot];
 
             forge::Node binary_node;
-            binary_node.op = actual_op;
+            binary_node.op = opcode;
             binary_node.a = a_id;
             binary_node.b = b_id;
             binary_node.c = 0;
@@ -113,8 +130,12 @@ ConversionResult convertXadTapeToForge(const xad::Tape<Real, N>& tape) {
             result_node_id = static_cast<forge::NodeId>(result.graph.nodes.size());
             result.graph.nodes.push_back(binary_node);
         }
-        else if (opcode == forge::OpCode::Mul && operands.size() == 1) {
-            // Scalar multiplication: m * x
+        else if (opcode == forge::OpCode::Assign && operands.size() == 1) {
+            // Assignment/identity: just pass through the existing node
+            result_node_id = slot_to_node[operands[0].slot];
+        }
+        else if (opcode == forge::OpCode::ScalarMul && operands.size() == 1) {
+            // Scalar multiplication: m * x (coefficient stored in derivative)
             double multiplier = operands[0].multiplier;
             forge::NodeId operand_id = slot_to_node[operands[0].slot];
 
@@ -149,14 +170,10 @@ ConversionResult convertXadTapeToForge(const xad::Tape<Real, N>& tape) {
             result_node_id = static_cast<forge::NodeId>(result.graph.nodes.size());
             result.graph.nodes.push_back(mul_node);
         }
-        else if (opcode == forge::OpCode::Input) {
-            // Identity: just pass through
-            result_node_id = slot_to_node[operands[0].slot];
-        }
         else {
-            // Unsupported operation for now
-            std::cerr << "Warning: Unsupported operation pattern with "
-                      << operands.size() << " operands" << std::endl;
+            // Unsupported operation
+            std::cerr << "Warning: Unsupported operation OpCode=" << static_cast<int>(opcode)
+                      << " with " << operands.size() << " operands" << std::endl;
 
             // Create a dummy node to keep going
             forge::Node dummy_node;
