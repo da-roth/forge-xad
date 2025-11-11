@@ -34,6 +34,13 @@ endif()
 # Configure Forge to use dynamic runtime (match XAD's default)
 set(FORGE_USE_STATIC_RUNTIME OFF CACHE BOOL "Use dynamic runtime (/MD) to match XAD" FORCE)
 
+# Suppress asmjit deprecation warnings
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(-Wno-\#pragma-messages)
+elseif(MSVC)
+    add_compile_options(/wd4995)
+endif()
+
 # Add Forge library
 add_subdirectory(extern/forge)
 
