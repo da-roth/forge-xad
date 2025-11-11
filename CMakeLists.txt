@@ -77,8 +77,9 @@ if(FORGE_XAD_BUILD_TESTS)
 endif()
 
 # Installation (optional - not needed for build-only usage)
-# Note: Installation is complex because forge and its dependencies (asmjit, sleef)
-# are FetchContent targets and would need to be included in the export set
+# NOTE: We do NOT export forge_xad_bridge because it has non-exportable dependencies
+# (forge, asmjit, sleef are FetchContent targets that cannot be exported)
+# forge_xad_bridge is only available for build-tree usage via add_subdirectory
 install(TARGETS forge_xad_bridge
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
