@@ -2,9 +2,9 @@
 
 #include <XAD/XAD.hpp>
 #include "forge_xad/xad_tape_converter.hpp"
-#include <compiler/forge_engine.hpp>
-#include <compiler/compiler_config.hpp>
-#include <compiler/node_value_buffers/node_value_buffer.hpp>
+#include <forge/compiler/forge_engine.hpp>
+#include <forge/compiler/compiler_config.hpp>
+#include <forge/compiler/node_value_buffers/node_value_buffer.hpp>
 #include <memory>
 #include <iostream>
 
