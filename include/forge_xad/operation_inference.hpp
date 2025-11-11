@@ -1,6 +1,6 @@
 #pragma once
 
-#include <forge/graph/graph.hpp>
+#include <graph/graph.hpp>
 #include <vector>
 #include <utility>
 #include <cmath>

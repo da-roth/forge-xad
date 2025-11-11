@@ -1,7 +1,7 @@
 #pragma once
 
 #include <XAD/XAD.hpp>
-#include <forge/graph/graph.hpp>
+#include <graph/graph.hpp>
 #include <memory>
 #include <unordered_map>
 
